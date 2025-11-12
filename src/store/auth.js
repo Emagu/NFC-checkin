@@ -21,7 +21,10 @@ export const useAuthStore = defineStore('auth', {
     },
     async refreshTokenIfNeeded(){
       const now = Date.now()
-      if (this.accessToken && now < this.expireAt - 30000) return true
+      if (!this.accessToken || this.expireAt === 0) {
+        return false
+      }
+      if (now < this.expireAt - 30000) return true
       try {
         const data = await refreshApi() // cookie auto-sent
         this.saveTokens(data)
