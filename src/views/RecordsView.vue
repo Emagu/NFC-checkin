@@ -59,10 +59,20 @@ async function downloadPoints() {
   downloading.value = true
   downloadMessage.value = '下載中...'
   try {
-    const res = await fetch('/api/locations')
+    const res = await fetch('/api/auth/locations', {
+      credentials: 'include'
+    })
     if (!res.ok) throw new Error(res.statusText || '下載失敗')
     const list = await res.json()
-    const count = await replaceLocations(list)
+    if (!Array.isArray(list)) throw new Error('資料格式錯誤')
+    const normalized = list.map(item => ({
+      id: Number(item.id),
+      name: item.name ?? '',
+      lat: item.lat != null ? Number(item.lat) : null,
+      lng: item.lng != null ? Number(item.lng) : null,
+      radius: item.radius ?? null
+    }))
+    const count = await replaceLocations(normalized)
     downloadMessage.value = `✅ 打卡點資訊已更新（${count} 筆）`
   } catch (err) {
     downloadMessage.value = `❌ 無法下載打卡點資訊：${err.message}`

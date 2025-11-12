@@ -7,12 +7,13 @@ export const useAuthStore = defineStore('auth', {
     expireAt: parseInt(localStorage.getItem('expireAt') || '0')
   }),
   actions: {
-    saveTokens({ accessToken, expiresIn }){
+    saveTokens({ accessToken, expiresIn, UserSN }){
       const now = Date.now()
       this.accessToken = accessToken
       this.expireAt = now + expiresIn * 1000
       localStorage.setItem('accessToken', accessToken)
       localStorage.setItem('expireAt', this.expireAt.toString())
+      localStorage.setItem('UserSN', UserSN)
     },
     async login(username, password){
       const data = await loginApi(username, password)
