@@ -74,35 +74,64 @@ async function syncCheckins() {
 
 // 安裝事件 - 預緩存關鍵資源
 self.addEventListener('install', event => {
-  console.log('SW installed');
+  console.log('[SW] Installing service worker...');
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then(cache => {
-        console.log('Caching app shell');
-        return cache.addAll(PRECACHE_URLS);
+        console.log('[SW] Caching app shell:', PRECACHE_URLS);
+        // 使用 addAll，如果任何一個失敗都會導致整個安裝失敗
+        // 改用 Promise.all 來處理，即使某些資源失敗也能繼續
+        return Promise.allSettled(
+          PRECACHE_URLS.map(url => 
+            fetch(url)
+              .then(response => {
+                if (response.ok) {
+                  return cache.put(url, response);
+                }
+                throw new Error(`Failed to fetch ${url}: ${response.status}`);
+              })
+              .catch(err => {
+                console.warn(`[SW] Failed to cache ${url}:`, err);
+                // 不拋出錯誤，讓其他資源繼續緩存
+              })
+          )
+        ).then(() => {
+          console.log('[SW] App shell cached');
+        });
       })
-      .then(() => self.skipWaiting()) // 立即激活新的 service worker
-      .catch(err => console.error('Cache failed', err))
+      .then(() => {
+        console.log('[SW] Service worker installed');
+        return self.skipWaiting(); // 立即激活新的 service worker
+      })
+      .catch(err => {
+        console.error('[SW] Installation failed:', err);
+        // 即使緩存失敗，也繼續安裝
+        return self.skipWaiting();
+      })
   );
 });
 
 // 激活事件 - 清理舊緩存
 self.addEventListener('activate', event => {
-  console.log('SW activated');
+  console.log('[SW] Activating service worker...');
   event.waitUntil(
     caches.keys().then(cacheNames => {
+      console.log('[SW] Found caches:', cacheNames);
       return Promise.all(
         cacheNames
           .filter(cacheName => {
             return cacheName !== CACHE_NAME && cacheName !== RUNTIME_CACHE;
           })
           .map(cacheName => {
-            console.log('Deleting old cache', cacheName);
+            console.log('[SW] Deleting old cache:', cacheName);
             return caches.delete(cacheName);
           })
       );
     })
-    .then(() => self.clients.claim()) // 立即控制所有頁面
+    .then(() => {
+      console.log('[SW] Service worker activated');
+      return self.clients.claim(); // 立即控制所有頁面
+    })
   );
 });
 
@@ -110,6 +139,11 @@ self.addEventListener('activate', event => {
 self.addEventListener('fetch', event => {
   const { request } = event;
   const url = new URL(request.url);
+
+  // 只處理同源請求
+  if (url.origin !== location.origin) {
+    return;
+  }
 
   // 跳過非 GET 請求
   if (request.method !== 'GET') {
@@ -121,51 +155,64 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // 處理導航請求（頁面請求）
+  // 調試日誌（可選，生產環境可移除）
+  // console.log('[SW] Fetching:', request.url);
+
+  // 處理導航請求（頁面請求）- 使用 Network First with Cache Fallback
   if (request.mode === 'navigate') {
     event.respondWith(
       fetch(request)
         .then(response => {
           // 如果成功，緩存並返回
-          const responseClone = response.clone();
-          caches.open(RUNTIME_CACHE).then(cache => {
-            cache.put(request, responseClone);
-          });
+          if (response && response.status === 200) {
+            const responseClone = response.clone();
+            caches.open(RUNTIME_CACHE).then(cache => {
+              cache.put(request, responseClone);
+            });
+          }
           return response;
         })
         .catch(() => {
-          // 如果失敗，從緩存返回 index.html
-          return caches.match('/index.html') || caches.match('/');
+          // 如果網絡失敗，嘗試從緩存返回
+          return caches.match(request)
+            .then(cachedResponse => {
+              if (cachedResponse) {
+                return cachedResponse;
+              }
+              // 如果緩存中也沒有該路徑，返回 index.html（SPA 回退）
+              return caches.match('/index.html') || caches.match('/');
+            });
         })
     );
     return;
   }
 
-  // 處理其他資源（CSS, JS, 圖片等）
+  // 處理其他資源（CSS, JS, 圖片等）- 使用 Network First with Cache Fallback
   event.respondWith(
-    caches.match(request)
-      .then(cachedResponse => {
-        if (cachedResponse) {
-          return cachedResponse;
+    fetch(request)
+      .then(response => {
+        // 如果網絡請求成功，緩存並返回
+        if (response && response.status === 200) {
+          const responseClone = response.clone();
+          caches.open(RUNTIME_CACHE).then(cache => {
+            cache.put(request, responseClone);
+          });
         }
-
-        // 如果緩存中沒有，從網絡獲取
-        return fetch(request)
-          .then(response => {
-            // 只緩存成功的響應
-            if (response && response.status === 200) {
-              const responseClone = response.clone();
-              caches.open(RUNTIME_CACHE).then(cache => {
-                cache.put(request, responseClone);
-              });
+        return response;
+      })
+      .catch(() => {
+        // 網絡請求失敗，嘗試從緩存返回
+        return caches.match(request)
+          .then(cachedResponse => {
+            if (cachedResponse) {
+              return cachedResponse;
             }
-            return response;
-          })
-          .catch(() => {
-            // 如果請求失敗且是圖片，可以返回一個占位符
-            if (request.destination === 'image') {
-              return new Response('', { status: 404 });
-            }
+            // 如果緩存中也沒有，返回適當的錯誤響應
+            return new Response('Resource not available offline', { 
+              status: 503, 
+              statusText: 'Service Unavailable',
+              headers: { 'Content-Type': 'text/plain' }
+            });
           });
       })
   );
