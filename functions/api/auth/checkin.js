@@ -60,7 +60,7 @@ function validatePayload(payload) {
     out.longitude = null
   }
 
-  const timeRaw = payload.time
+  const timeRaw = payload.checkinTime
   if (!timeRaw) {
     errors.push('time 為必填欄位')
   } else {
