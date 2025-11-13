@@ -40,6 +40,13 @@ if ('serviceWorker' in navigator) {
     // 監聽 service worker 消息
     navigator.serviceWorker.addEventListener('message', event => {
       console.log('[SW] Message received:', event.data)
+      if (event.data && event.data.type === 'SW_ACTIVATED' && event.data.shouldReload) {
+        console.log('[SW] Service Worker activated but resources not cached, reloading page...')
+        // 延遲一下再重新載入，確保 Service Worker 完全準備好
+        setTimeout(() => {
+          window.location.reload()
+        }, 100)
+      }
     })
   })
 }
