@@ -20,8 +20,8 @@
     <p v-if="downloadMessage" class="text-sm text-gray-600">{{ downloadMessage }}</p>
     <p v-if="syncStatus" class="text-sm text-gray-600">{{ syncStatus }}</p>
     <ul v-if="records.length" class="list-disc pl-5 space-y-1">
-      <li v-for="record in records" :key="record.id ?? record.time">
-        {{ formatTime(record.time) }} - {{ record.location }} {{ record.synced ? '✅' : '❌(待同步)' }}
+      <li v-for="record in records" :key="record.id ?? record.checkinTime">
+        {{ formatTime(record.checkinTime) }} - {{ record.location }} {{ record.synced ? '✅' : '❌(待同步)' }}
       </li>
     </ul>
     <p v-else>目前沒有打卡紀錄</p>

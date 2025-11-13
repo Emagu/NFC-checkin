@@ -74,9 +74,15 @@ self.addEventListener('install', event => {
 });
 
 self.addEventListener('fetch', event => {
-  event.respondWith(
-    caches.match(event.request).then(res => res || fetch(event.request))
-  );
+  if (event.request.mode === 'navigate') {
+    event.respondWith(
+      fetch(event.request).catch(() => caches.match('/index.html'))
+    );
+  } else {
+    event.respondWith(
+      caches.match(event.request).then((resp) => resp || fetch(event.request))
+    );
+  }
 });
 
 self.addEventListener('sync', event => {
