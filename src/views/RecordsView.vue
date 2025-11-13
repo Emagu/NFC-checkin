@@ -14,7 +14,7 @@
         :disabled="syncing"
         @click="manualSync"
       >
-        手動同步未同步紀錄
+        手動上傳未同步打卡紀錄
       </button>
     </div>
     <p v-if="downloadMessage" class="text-sm text-gray-600">{{ downloadMessage }}</p>
@@ -35,14 +35,17 @@ import {
   getUnsyncedCheckins,
   replaceLocations,
   saveCheckinRecord,
-  registerBackgroundSync
+  registerBackgroundSync,
+  uploadCheckinRecord
 } from '@/utils/checkinDb'
+import { useAuthStore } from '@/store/auth'
 
 const records = ref([])
 const syncStatus = ref('')
 const downloadMessage = ref('')
 const syncing = ref(false)
 const downloading = ref(false)
+const auth = useAuthStore()
 
 function formatTime(value) {
   return new Date(value).toLocaleString()
@@ -87,22 +90,33 @@ async function manualSync() {
   syncStatus.value = '同步中...'
   try {
     const unsynced = await getUnsyncedCheckins()
+    if (!unsynced.length) {
+      syncStatus.value = '目前沒有待同步的紀錄'
+      return
+    }
+    let successCount = 0
+    let failureCount = 0
     for (const item of unsynced) {
       try {
-        const res = await fetch('/api/checkin', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(item)
-        })
-        if (res.ok) {
-          item.synced = true
-          await saveCheckinRecord(item)
-        }
+        await uploadCheckinRecord(item, { requireAuth: true, throwOnError: true })
+        item.synced = true
+        await saveCheckinRecord(item)
+        successCount += 1
       } catch (err) {
         console.warn('manualSync upload failed', err)
+        if (err.status === 401 || err.message.includes('請重新登入')) {
+          throw err
+        }
+        failureCount += 1
       }
     }
-    syncStatus.value = '同步完成'
+    if (failureCount === 0) {
+      syncStatus.value = `同步完成（成功 ${successCount} 筆）`
+    } else if (successCount === 0) {
+      syncStatus.value = '同步失敗，請稍後再試'
+    } else {
+      syncStatus.value = `同步完成：成功 ${successCount} 筆，失敗 ${failureCount} 筆`
+    }
   } catch (err) {
     syncStatus.value = `同步失敗：${err.message}`
   } finally {
@@ -127,4 +141,5 @@ onUnmounted(() => {
   window.removeEventListener('online', handleOnline)
 })
 </script>
+
 

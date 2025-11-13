@@ -1,3 +1,5 @@
+import { useAuthStore } from '@/store/auth'
+
 export function calcDistance(lat1, lon1, lat2, lon2) {
   const R = 6371000;
   const toRad = deg => (deg * Math.PI) / 180;
@@ -61,6 +63,67 @@ export async function getAllCheckins() {
 export async function getUnsyncedCheckins() {
   const all = await getAllCheckins();
   return all.filter(item => !item.synced);
+}
+
+export async function uploadCheckinRecord(record, options = {}) {
+  const { requireAuth = false, throwOnError = false } = options;
+  const auth = useAuthStore();
+  const tokenReady = await auth.refreshTokenIfNeeded();
+  const hasToken = Boolean(auth.accessToken);
+
+  if (!tokenReady || !hasToken) {
+    const authError = new Error('尚未登入或登入已過期，請重新登入後再試');
+    authError.status = 401;
+    if (requireAuth || throwOnError) {
+      if (throwOnError) {
+        throw authError;
+      }
+      return { ok: false, status: 401, error: authError };
+    }
+    return { ok: false, status: 401, error: authError };
+  }
+
+  const headers = {
+    'Content-Type': 'application/json',
+    Authorization: `Bearer ${auth.accessToken}`
+  };
+
+  try {
+    const res = await fetch('/api/checkin', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(record)
+    });
+
+    if (res.status === 401) {
+      auth.logout();
+      const err = new Error('登入已過期，請重新登入');
+      err.status = 401;
+      if (throwOnError) {
+        throw err;
+      }
+      return { ok: false, status: 401, error: err };
+    }
+
+    if (!res.ok) {
+      const data = await res.json().catch(() => null);
+      const message = data?.message || `上傳失敗（HTTP ${res.status}）`;
+      const err = new Error(message);
+      err.status = res.status;
+      err.response = data;
+      if (throwOnError) {
+        throw err;
+      }
+      return { ok: false, status: res.status, error: err };
+    }
+
+    return { ok: true, status: res.status };
+  } catch (err) {
+    if (throwOnError) {
+      throw err;
+    }
+    return { ok: false, status: err.status ?? 0, error: err };
+  }
 }
 
 export async function replaceLocations(list) {

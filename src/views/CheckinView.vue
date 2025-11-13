@@ -23,8 +23,10 @@ import {
   calcDistance,
   getLocationById,
   saveCheckinRecord,
-  registerBackgroundSync
+  registerBackgroundSync,
+  uploadCheckinRecord
 } from '@/utils/checkinDb'
+import { useAuthStore } from '@/store/auth'
 
 const route = useRoute()
 const point = ref(null)
@@ -32,6 +34,7 @@ const timeDisplay = ref('')
 const statusMessage = ref('')
 const submitting = ref(false)
 let timer = null
+const auth = useAuthStore()
 
 const locationDisplay = computed(() => {
   if (!point.value) return '❌ 無法找到打卡點'
@@ -71,19 +74,6 @@ function getCurrentPosition() {
   })
 }
 
-async function tryUpload(record) {
-  try {
-    const res = await fetch('/api/checkin', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(record)
-    })
-    return res.ok
-  } catch {
-    return false
-  }
-}
-
 async function handleCheckin() {
   if (!point.value || submitting.value) return
   submitting.value = true
@@ -106,22 +96,22 @@ async function handleCheckin() {
       return
     }
     const record = {
-      user: localStorage.getItem('username') || 'anonymous',
+      userSN: auth.userSN,
       location: point.value.name,
-      pointId: point.value.id,
-      gps: { lat: latitude, lng: longitude },
-      time: new Date().toISOString(),
-      synced: false
+      locationSN: point.value.id,
+      latitude: latitude,
+      longitude: longitude,
+      checkinTime: new Date().toISOString()
     }
-    const uploaded = await tryUpload(record)
-    if (uploaded) {
+    const uploadResult = await uploadCheckinRecord(record)
+    if (uploadResult.ok) {
       record.synced = true
       statusMessage.value = '✅ 打卡成功並同步雲端'
     } else {
       statusMessage.value = '📴 打卡已離線儲存，稍後會嘗試同步'
     }
     await saveCheckinRecord(record)
-    if (!uploaded) {
+    if (!uploadResult.ok) {
       await registerBackgroundSync()
     }
   } catch (err) {
