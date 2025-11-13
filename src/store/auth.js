@@ -4,7 +4,8 @@ import { loginApi, refreshApi } from '@/api/auth'
 export const useAuthStore = defineStore('auth', {
   state: () => ({
     accessToken: localStorage.getItem('accessToken') || '',
-    expireAt: parseInt(localStorage.getItem('expireAt') || '0')
+    expireAt: parseInt(localStorage.getItem('expireAt') || '0'),
+    userSN: localStorage.getItem('UserSN') || null
   }),
   actions: {
     saveTokens({ accessToken, expiresIn, UserSN }){
@@ -16,6 +17,7 @@ export const useAuthStore = defineStore('auth', {
       if(UserSN != null)
       {
         localStorage.setItem('UserSN', UserSN);
+        this.userSN = UserSN;
       }
     },
     async login(username, password){
