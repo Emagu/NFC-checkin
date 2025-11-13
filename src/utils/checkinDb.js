@@ -89,7 +89,7 @@ export async function uploadCheckinRecord(record, options = {}) {
   };
 
   try {
-    const res = await fetch('/api/checkin', {
+    const res = await fetch('/api/auth/checkin', {
       method: 'POST',
       headers,
       body: JSON.stringify(record)
