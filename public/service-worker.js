@@ -160,14 +160,20 @@ self.addEventListener('fetch', event => {
 
   // 處理導航請求（頁面請求）- 使用 Network First with Cache Fallback
   if (request.mode === 'navigate') {
+    // 創建一個新的 Request 對象，明確設置 redirect 模式為 'follow'
+    // 使用 request.clone() 然後覆蓋 redirect 屬性
+    const fetchRequest = request.redirect === 'follow' 
+      ? request 
+      : new Request(request, { redirect: 'follow' });
+
     event.respondWith(
-      fetch(request, { redirect: 'follow' })
+      fetch(fetchRequest)
         .then(response => {
           // 如果成功，緩存並返回
           if (response && response.status === 200 && response.type !== 'opaqueredirect') {
             const responseClone = response.clone();
             caches.open(RUNTIME_CACHE).then(cache => {
-              // 創建一個新的 Request 對象用於緩存，避免重定向問題
+              // 使用 URL 字符串作為 key，避免重定向問題
               cache.put(request.url, responseClone);
             });
           }
@@ -189,8 +195,13 @@ self.addEventListener('fetch', event => {
   }
 
   // 處理其他資源（CSS, JS, 圖片等）- 使用 Network First with Cache Fallback
+  // 創建一個新的 Request 對象，明確設置 redirect 模式為 'follow'
+  const fetchRequest = request.redirect === 'follow' 
+    ? request 
+    : new Request(request, { redirect: 'follow' });
+
   event.respondWith(
-    fetch(request, { redirect: 'follow' })
+    fetch(fetchRequest)
       .then(response => {
         // 如果網絡請求成功，緩存並返回
         if (response && response.status === 200 && response.type !== 'opaqueredirect') {
