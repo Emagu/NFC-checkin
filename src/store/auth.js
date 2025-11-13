@@ -13,7 +13,10 @@ export const useAuthStore = defineStore('auth', {
       this.expireAt = now + expiresIn * 1000
       localStorage.setItem('accessToken', accessToken)
       localStorage.setItem('expireAt', this.expireAt.toString())
-      localStorage.setItem('UserSN', UserSN)
+      if(UserSN != null)
+      {
+        localStorage.setItem('UserSN', UserSN);
+      }
     },
     async login(username, password){
       const data = await loginApi(username, password)
