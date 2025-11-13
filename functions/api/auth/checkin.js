@@ -80,31 +80,37 @@ function validatePayload(payload) {
 }
 
 export async function onRequestPost({ request, env }) {
-  if (!env?.DB) {
-    return jsonResponse({ message: 'database unavailable' }, { status: 500 })
+  try
+  {
+    if (!env?.DB) {
+      return jsonResponse({ message: 'database unavailable' }, { status: 500 })
+    }
+  
+    const payload = await request.json().catch(() => null)
+    const validation = validatePayload(payload)
+    if (!validation.ok) {
+      return jsonResponse({ message: 'invalid payload', errors: validation.errors }, { status: 400 })
+    }
+  
+    const { userSN, locationSN, latitude, longitude, checkinTime } = validation.data
+  
+    try {
+      const result = await env.DB.prepare(
+        `INSERT INTO checkins (userSN, locationSN, latitude, longitude, checkin_time)
+         VALUES (?, ?, ?, ?, ?, ?)`
+      )
+        .bind(userSN, locationSN, latitude, longitude, checkinTime)
+        .run()
+  
+      const insertedId = result?.meta?.last_row_id ?? null
+  
+      return jsonResponse({ success: true, id: insertedId })
+    } catch (error) {
+      return jsonResponse({ message: 'database error' }, { status: 500 })
+    }
   }
-
-  const payload = await request.json().catch(() => null)
-  const validation = validatePayload(payload)
-  if (!validation.ok) {
-    return jsonResponse({ message: 'invalid payload', errors: validation.errors }, { status: 400 })
-  }
-
-  const { userSN, locationSN, latitude, longitude, checkinTime } = validation.data
-
-  try {
-    const result = await env.DB.prepare(
-      `INSERT INTO checkins (userSN, locationSN, latitude, longitude, checkin_time)
-       VALUES (?, ?, ?, ?, ?, ?)`
-    )
-      .bind(userSN, locationSN, latitude, longitude, checkinTime)
-      .run()
-
-    const insertedId = result?.meta?.last_row_id ?? null
-
-    return jsonResponse({ success: true, id: insertedId })
-  } catch (error) {
-    return jsonResponse({ message: 'database error' }, { status: 500 })
+  catch (err) {
+    return jsonResponse({ message: err }, { status: 500 })
   }
 }
 
