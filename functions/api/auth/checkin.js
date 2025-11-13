@@ -13,7 +13,7 @@ function validatePayload(payload) {
   const out = {}
 
   const userSNRaw = payload.userSN
-  if (userSN != null) {
+  if (userSNRaw != null) {
     const userSNNum = Number(userSNRaw)
     if (Number.isFinite(userSNNum)) {
       out.userSN = userSNNum
@@ -27,7 +27,7 @@ function validatePayload(payload) {
   const locationSNRaw = payload.locationSN
   if (locationSNRaw != null) {
     const locationSNNum = Number(locationSNRaw)
-    if (Number.isFinite(pointIdNum)) {
+    if (Number.isFinite(locationSNNum)) {
       out.locationSN = locationSNNum
     } else {
       errors.push('locationSN 必須為數值')
@@ -97,7 +97,7 @@ export async function onRequestPost({ request, env }) {
     try {
       const result = await env.DB.prepare(
         `INSERT INTO checkins (userSN, locationSN, latitude, longitude, checkin_time)
-         VALUES (?, ?, ?, ?, ?, ?)`
+         VALUES (?, ?, ?, ?, ?)`
       )
         .bind(userSN, locationSN, latitude, longitude, checkinTime)
         .run()
