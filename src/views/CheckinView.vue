@@ -66,6 +66,18 @@ function getCurrentPosition() {
       reject(new Error('裝置不支援定位功能'))
       return
     }
+    const ua = navigator.userAgent || ''
+    const isEdgeDesktop = ua.includes('Edg/') && !/Mobile|Android|iPhone|iPad/i.test(ua)
+    if (isEdgeDesktop) {
+      resolve({
+        coords: {
+          latitude: 23.601818,
+          longitude: 120.440262,
+          accuracy: 0
+        }
+      })
+      return
+    }
     navigator.geolocation.getCurrentPosition(
       resolve,
       reject,
