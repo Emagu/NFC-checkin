@@ -161,20 +161,21 @@ self.addEventListener('fetch', event => {
   // 處理導航請求（頁面請求）- 使用 Network First with Cache Fallback
   if (request.mode === 'navigate') {
     event.respondWith(
-      fetch(request)
+      fetch(request, { redirect: 'follow' })
         .then(response => {
           // 如果成功，緩存並返回
-          if (response && response.status === 200) {
+          if (response && response.status === 200 && response.type !== 'opaqueredirect') {
             const responseClone = response.clone();
             caches.open(RUNTIME_CACHE).then(cache => {
-              cache.put(request, responseClone);
+              // 創建一個新的 Request 對象用於緩存，避免重定向問題
+              cache.put(request.url, responseClone);
             });
           }
           return response;
         })
         .catch(() => {
           // 如果網絡失敗，嘗試從緩存返回
-          return caches.match(request)
+          return caches.match(request.url)
             .then(cachedResponse => {
               if (cachedResponse) {
                 return cachedResponse;
@@ -189,20 +190,21 @@ self.addEventListener('fetch', event => {
 
   // 處理其他資源（CSS, JS, 圖片等）- 使用 Network First with Cache Fallback
   event.respondWith(
-    fetch(request)
+    fetch(request, { redirect: 'follow' })
       .then(response => {
         // 如果網絡請求成功，緩存並返回
-        if (response && response.status === 200) {
+        if (response && response.status === 200 && response.type !== 'opaqueredirect') {
           const responseClone = response.clone();
           caches.open(RUNTIME_CACHE).then(cache => {
-            cache.put(request, responseClone);
+            // 使用 request.url 作為 key，避免重定向問題
+            cache.put(request.url, responseClone);
           });
         }
         return response;
       })
       .catch(() => {
         // 網絡請求失敗，嘗試從緩存返回
-        return caches.match(request)
+        return caches.match(request.url)
           .then(cachedResponse => {
             if (cachedResponse) {
               return cachedResponse;
