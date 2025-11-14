@@ -23,7 +23,14 @@ router.beforeEach(async (to, from, next) => {
   const auth = useAuthStore()
   if (to.meta.auth) {
     const ok = await auth.refreshTokenIfNeeded()
-    if (!ok) return next('/login')
+    if (!ok) {
+      // 如果裝置未連線，允許繼續訪問（離線模式）
+      if (!navigator.onLine) {
+        return next()
+      }
+      // 裝置已連線但 token 刷新失敗，跳轉到登入頁
+      return next('/login')
+    }
   }
   next()
 })
